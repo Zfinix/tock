@@ -16,7 +16,7 @@ use kiln::render::Renderable;
 use kiln::terminal::{Tui, TuiEvent, restore_raw};
 
 use timer::Timer;
-use view::Finish;
+use view::{Finish, Keys};
 
 const TICK: Duration = Duration::from_millis(200);
 const DEFAULT_LENGTH: Duration = Duration::from_secs(25 * 60);
@@ -32,7 +32,7 @@ Options:
   -h, --help           show this help
   -V, --version        show the version
 
-Keys: q quit
+Keys: space pause, r restart, + / - a minute, ? help, q quit
 ";
 
 #[tokio::main(flavor = "current_thread")]
@@ -75,7 +75,8 @@ async fn run() -> Result<()> {
     let _guard = TuiGuard::install(restore_raw);
     let mut tui = Tui::new(8)?;
     let frames = tui.frame_requester();
-    let timer = Timer::start(length.unwrap_or(DEFAULT_LENGTH), Instant::now());
+    let mut timer = Timer::start(length.unwrap_or(DEFAULT_LENGTH), Instant::now());
+    let mut keys = Keys::Footer;
 
     let finish = loop {
         let now = Instant::now();
@@ -83,18 +84,27 @@ async fn run() -> Result<()> {
             break Finish::Done { at: None };
         }
         let width = tui.width();
-        let pane = view::pane(&timer, now, LABEL, width);
+        let pane = view::pane(&timer, now, LABEL, keys, width);
         tui.draw(pane.desired_height(width), |frame| {
             pane.render(frame.area(), frame.buffer_mut());
         })?;
-        frames.schedule_in(TICK);
+        if !timer.is_paused() {
+            frames.schedule_in(TICK);
+        }
 
-        match tui.next_event().await {
+        let event = tui.next_event().await;
+        let now = Instant::now();
+        match event {
             TuiEvent::Key(key) => {
                 let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
                 match key.code {
                     KeyCode::Char('c') if ctrl => break Finish::Stopped,
                     KeyCode::Char('q') => break Finish::Stopped,
+                    KeyCode::Char(' ') => timer.toggle(now),
+                    KeyCode::Char('r') => timer.restart(now),
+                    KeyCode::Char('+' | '=') => timer.add_minute(),
+                    KeyCode::Char('-' | '_') => timer.remove_minute(now),
+                    KeyCode::Char('?') => keys = keys.toggle(),
                     _ => {}
                 }
             }
