@@ -5,6 +5,7 @@ edition = "2024"
 rust-version = "1.88"
 description = "A pomodoro timer in your terminal."
 license = "Apache-2.0"
+readme = "README.md"
 keywords = ["pomodoro", "timer", "cli", "tui"]
 categories = ["command-line-utilities"]
 
