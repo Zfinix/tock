@@ -11,11 +11,11 @@ the way.
 ## Install
 
 ```sh
-cargo install --path .
+cargo install --git https://github.com/Zfinix/tock
 ```
 
-tock is built on [kiln](https://github.com/Zfinix/kiln), which it finds at
-`../kiln`. Clone kiln next to this repo before you build.
+You need Rust 1.88 or newer. tock is built on
+[kiln](https://github.com/Zfinix/kiln), which Cargo fetches for you.
 
 ## Usage
 

@@ -5,6 +5,7 @@ edition = "2024"
 rust-version = "1.88"
 description = "A pomodoro timer in your terminal."
 license = "Apache-2.0"
+repository = "https://github.com/Zfinix/tock"
 readme = "README.md"
 keywords = ["pomodoro", "timer", "cli", "tui"]
 categories = ["command-line-utilities"]
@@ -12,7 +13,7 @@ categories = ["command-line-utilities"]
 [dependencies]
 anyhow = "1.0"
 crossterm = "0.29"
-kiln = { path = "../kiln" }
+kiln = { git = "https://github.com/Zfinix/kiln", tag = "v0.2.0" }
 ratatui = "0.30"
 serde_json = "1.0"
 tokio = { version = "1", features = ["rt", "macros", "time"] }
