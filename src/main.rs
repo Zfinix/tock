@@ -1,12 +1,15 @@
 //! tock, a pomodoro timer in your terminal.
 
 mod duration;
+mod timer;
 
 use std::io::{self, Write};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use anyhow::{Result, bail};
+
+use timer::Timer;
 
 const TICK: Duration = Duration::from_millis(200);
 const DEFAULT_LENGTH: Duration = Duration::from_secs(25 * 60);
@@ -53,11 +56,10 @@ fn run() -> Result<()> {
         }
     }
 
-    let length = length.unwrap_or(DEFAULT_LENGTH);
-    let started = Instant::now();
+    let timer = Timer::start(length.unwrap_or(DEFAULT_LENGTH), Instant::now());
     let mut out = io::stdout();
     loop {
-        let remaining = length.saturating_sub(started.elapsed());
+        let remaining = timer.remaining(Instant::now());
         let secs = remaining.as_secs() + u64::from(remaining.subsec_nanos() > 0);
         write!(out, "\r{}  ", duration::clock(secs))?;
         out.flush()?;
@@ -69,7 +71,7 @@ fn run() -> Result<()> {
     writeln!(
         out,
         "\r\x07focus done ({})",
-        duration::short(length.as_secs())
+        duration::short(timer.planned().as_secs())
     )?;
     Ok(())
 }
