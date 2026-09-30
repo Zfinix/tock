@@ -9,18 +9,18 @@ use std::io::{self, IsTerminal, Write};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use crossterm::event::{KeyCode, KeyModifiers};
 use kiln::guard::TuiGuard;
 use kiln::render::Renderable;
 use kiln::terminal::{Tui, TuiEvent, restore_raw};
+use kiln::theme;
 
 use timer::Timer;
 use view::{Finish, Keys};
 
 const TICK: Duration = Duration::from_millis(200);
 const DEFAULT_LENGTH: Duration = Duration::from_secs(25 * 60);
-const LABEL: &str = "focus";
 
 const USAGE: &str = "A pomodoro timer in your terminal.
 
@@ -29,11 +29,23 @@ Usage: tock [length] [options]
   length           25m, 90s, 1h30m, 1:30 or a number of minutes (default 25m)
 
 Options:
+  -l, --label <text>   what the timer is for (default focus)
+  -t, --theme <name>   colour theme (default ember, or $TOCK_THEME)
+      --themes         list the themes
+  -q, --quiet          leave nothing in scrollback when it ends
+      --json           print one JSON line when it ends
   -h, --help           show this help
   -V, --version        show the version
 
 Keys: space pause, r restart, + / - a minute, ? help, q quit
 ";
+
+/// What tock leaves behind when the timer ends.
+enum Output {
+    Line,
+    Quiet,
+    Json,
+}
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -45,8 +57,35 @@ async fn main() {
 
 async fn run() -> Result<()> {
     let mut length: Option<Duration> = None;
-    for arg in std::env::args().skip(1) {
+    let mut label = "focus".to_string();
+    let mut theme_name = std::env::var("TOCK_THEME").unwrap_or_else(|_| "ember".into());
+    let mut output = Output::Line;
+    let names = || {
+        theme::all()
+            .iter()
+            .map(|entry| entry.name.as_str())
+            .collect::<Vec<_>>()
+    };
+
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
         match arg.as_str() {
+            "-l" | "--label" => {
+                label = args
+                    .next()
+                    .context("--label needs some text, like --label writing")?;
+            }
+            "-t" | "--theme" => {
+                theme_name = args
+                    .next()
+                    .context("--theme needs a name, run tock --themes to see them")?;
+            }
+            "--themes" => {
+                println!("{}", names().join("\n"));
+                return Ok(());
+            }
+            "-q" | "--quiet" => output = Output::Quiet,
+            "--json" => output = Output::Json,
             "-h" | "--help" => {
                 print!("{USAGE}");
                 return Ok(());
@@ -67,6 +106,15 @@ async fn run() -> Result<()> {
         }
     }
 
+    let Some(entry) = theme::named(&theme_name) else {
+        bail!(
+            "there is no theme called {theme_name}, try one of: {}",
+            names().join(", ")
+        );
+    };
+    theme::set(entry.theme);
+    theme::settle();
+
     if !io::stdout().is_terminal() {
         bail!(
             "the timer draws on the terminal, so run tock without capturing or redirecting its output"
@@ -84,7 +132,7 @@ async fn run() -> Result<()> {
             break Finish::Done { at: None };
         }
         let width = tui.width();
-        let pane = view::pane(&timer, now, LABEL, keys, width);
+        let pane = view::pane(&timer, now, &label, keys, width);
         tui.draw(pane.desired_height(width), |frame| {
             pane.render(frame.area(), frame.buffer_mut());
         })?;
@@ -132,7 +180,25 @@ async fn run() -> Result<()> {
         Finish::Stopped => Finish::Stopped,
     };
 
-    let width = tui.width() as usize;
-    tui.insert_history(view::summary(&finish, &timer, now, LABEL, width))?;
+    match output {
+        Output::Line => {
+            let width = tui.width() as usize;
+            tui.insert_history(view::summary(&finish, &timer, now, &label, width))?;
+        }
+        Output::Quiet => {}
+        Output::Json => {
+            drop(tui);
+            let completed = match finish {
+                Finish::Done { .. } => true,
+                Finish::Stopped => false,
+            };
+            let planned = timer.planned().as_secs();
+            let elapsed = timer.elapsed(now).as_secs();
+            println!(
+                r#"{{"label":{},"planned_secs":{planned},"elapsed_secs":{elapsed},"completed":{completed}}}"#,
+                serde_json::to_string(&label)?
+            );
+        }
+    }
     Ok(())
 }
