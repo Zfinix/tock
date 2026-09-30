@@ -6,7 +6,7 @@ tock counts down in a small pane under your prompt. When the time is up it
 rings the terminal bell, leaves one line in your scrollback, and gets out of
 the way.
 
-![tock counting down a writing session under a finished tea timer](assets/demo.png)
+![tock counting down a writing session under a finished tea timer](assets/demo.gif)
 
 ## Install
 
