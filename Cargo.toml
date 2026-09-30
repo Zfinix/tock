@@ -1,0 +1,12 @@
+[package]
+name = "tock"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "A pomodoro timer in your terminal."
+license = "Apache-2.0"
+keywords = ["pomodoro", "timer", "cli", "tui"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+anyhow = "1.0"
